@@ -5,17 +5,19 @@ export type SyncStatus = "PENDING" | "SYNCING" | "COMPLETED";
 export type TransactionType = "SWAP" | "SEND" | "RECEIVE" | "MINT";
 export type TransactionStatus = "SUCCESS" | "FAILED";
 
-// ─── Write Model (PostgreSQL) ──────────────────────────────────────────────────
+// ─── User (stored in Zustand after connect) ───────────────────────────────────
 
 export interface User {
   id: string;
   email?: string | null;
-  createdAt: string;
-  walletAddress?: string;
+  createdAt?: string;
+  walletAddress?: string; // connected wallet address (used as userId)
 }
 
+// ─── Wallet (local state — backend only has POST /wallets, no GET) ─────────────
+
 export interface Wallet {
-  id: string;
+  id: string;           // walletId from API response
   userId: string;
   address: string;
   chainType: ChainType;
@@ -23,24 +25,7 @@ export interface Wallet {
   createdAt?: string;
 }
 
-export interface RawTransaction {
-  id: string;
-  walletId: string;
-  signature: string;
-  blockTime: string;
-  fee: number;
-  status: TransactionStatus;
-}
-
-export interface TokenTransfer {
-  id: string;
-  txId: string;
-  tokenMint: string;
-  amount: bigint;
-  direction: "IN" | "OUT";
-}
-
-// ─── Read Model (MongoDB projections) ─────────────────────────────────────────
+// ─── Portfolio — matches MongoDB portfolio_summaries collection ───────────────
 
 export interface Asset {
   tokenMint: string;
@@ -56,11 +41,14 @@ export interface Asset {
 export interface PortfolioSummary {
   userId: string;
   totalNetWorthUsd: number;
-  lastSyncedAt: string;
+  lastSyncedAt: string | null;
   assets: Asset[];
+  message?: string; // "Portfolio not yet synced. Add a wallet to start."
   change24hPercent?: number;
   change24hUsd?: number;
 }
+
+// ─── Transactions — matches MongoDB enriched_transactions collection ───────────
 
 export interface TransactionTokenInfo {
   symbol: string;
@@ -76,7 +64,8 @@ export interface TransactionDetails {
 }
 
 export interface EnrichedTransaction {
-  id: string;
+  _id?: string;           // MongoDB ObjectId
+  id?: string;
   userId: string;
   walletAddress: string;
   signature: string;
@@ -84,7 +73,7 @@ export interface EnrichedTransaction {
   timestamp: string;
   details: TransactionDetails;
   feeUsd: number;
-  status: TransactionStatus;
+  status?: TransactionStatus;
 }
 
 // ─── API Helpers ───────────────────────────────────────────────────────────────
@@ -94,7 +83,7 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   limit: number;
-  hasNextPage: boolean;
+  totalPages: number; // real backend field
 }
 
 export interface ApiError {
@@ -103,17 +92,7 @@ export interface ApiError {
   error?: string;
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-export interface NonceResponse {
-  nonce: string;
-  message: string;
-}
-
-export interface AuthResponse {
-  accessToken: string;
-  user: User;
-}
+// ─── Payload types ────────────────────────────────────────────────────────────
 
 export interface AddWalletPayload {
   address: string;
@@ -124,6 +103,6 @@ export interface TransactionFilters {
   page?: number;
   limit?: number;
   type?: TransactionType | "";
-  walletAddress?: string;
-  token?: string;
+  walletAddress?: string; // for local filter display only (not sent to API)
+  token?: string;         // for local filter display only (not sent to API)
 }
